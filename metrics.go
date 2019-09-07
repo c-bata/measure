@@ -24,8 +24,10 @@ const (
 var (
 	Disabled bool
 
-	defaultMetrics *Metrics
-	netDataCounter = expvar.NewMap("counters")
+	defaultMetrics   *Metrics
+	netDataCounter   = expvar.NewMap("counters")
+	netDataTotalTime = expvar.NewMap("total")
+	expvarmu sync.Mutex
 )
 
 func init() {
@@ -39,7 +41,6 @@ type Measure struct {
 }
 
 func Start(key string) Measure {
-	netDataCounter.Add(key, 1)
 	return defaultMetrics.Start(key)
 }
 
@@ -60,7 +61,6 @@ func GetStats() StatsSlice {
 }
 
 func Reset() {
-	netDataCounter.Init()
 	defaultMetrics.Reset()
 }
 
@@ -72,6 +72,9 @@ func (m *Metrics) Start(key string) Measure {
 	if Disabled {
 		return Measure{}
 	}
+	expvarmu.Lock()
+	netDataCounter.Add(key, 1)
+	expvarmu.Unlock()
 	return Measure{key: key, start: time.Now(), metrics: m}
 }
 
@@ -91,6 +94,12 @@ func (m *Metrics) Update(key string, start time.Time) {
 	}
 
 	t.Update(time.Since(start))
+
+	next := float64(t.Sum()) / float64(time.Millisecond)
+	expvarmu.Lock()
+	defer expvarmu.Unlock()
+	v := netDataTotalTime.Get(key).(*expvar.Float)
+	netDataTotalTime.AddFloat(key, next - v.Value())
 }
 
 func (m *Metrics) GetStats() StatsSlice {
@@ -116,6 +125,8 @@ func (m *Metrics) GetStats() StatsSlice {
 func (m *Metrics) Reset() {
 	m.mu.Lock()
 	m.metrics = make(map[string]mt.Timer)
+	netDataCounter.Init()
+	netDataTotalTime.Init()
 	m.mu.Unlock()
 }
 
