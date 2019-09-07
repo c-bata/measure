@@ -24,10 +24,12 @@ const (
 var (
 	Disabled bool
 
-	defaultMetrics   *Metrics
-	expvarmu         sync.Mutex
-	netDataCounter   = expvar.NewMap("counters")
-	netDataTotalTime = expvar.NewMap("total")
+	defaultMetrics *Metrics
+
+	expvarmu      sync.Mutex
+	expvarCounter = expvar.NewMap("counters")
+	expvarTotal   = expvar.NewMap("totals")
+	expvarAvg     = expvar.NewMap("averages")
 )
 
 func init() {
@@ -73,7 +75,7 @@ func (m *Metrics) Start(key string) Measure {
 		return Measure{}
 	}
 	expvarmu.Lock()
-	netDataCounter.Add(key, 1)
+	expvarCounter.Add(key, 1)
 	expvarmu.Unlock()
 	return Measure{key: key, start: time.Now(), metrics: m}
 }
@@ -95,15 +97,23 @@ func (m *Metrics) Update(key string, start time.Time) {
 
 	t.Update(time.Since(start))
 
-	next := float64(t.Sum()) / float64(time.Millisecond)
+	nexttot := float64(t.Sum()) / float64(time.Millisecond)
 	expvarmu.Lock()
 	defer expvarmu.Unlock()
-	v, ok := netDataTotalTime.Get(key).(*expvar.Float)
+	tot, ok := expvarTotal.Get(key).(*expvar.Float)
 	if !ok {
-		v = new(expvar.Float)
-		netDataTotalTime.Set(key, v)
+		tot = new(expvar.Float)
+		expvarTotal.Set(key, tot)
 	}
-	netDataTotalTime.AddFloat(key, next-v.Value())
+	expvarTotal.AddFloat(key, nexttot-tot.Value())
+
+	nextavg := float64(t.Mean()) / float64(time.Millisecond)
+	avg, ok := expvarAvg.Get(key).(*expvar.Float)
+	if !ok {
+		avg = new(expvar.Float)
+		expvarAvg.Set(key, avg)
+	}
+	expvarAvg.AddFloat(key, nextavg-avg.Value())
 }
 
 func (m *Metrics) GetStats() StatsSlice {
@@ -129,8 +139,9 @@ func (m *Metrics) GetStats() StatsSlice {
 func (m *Metrics) Reset() {
 	m.mu.Lock()
 	m.metrics = make(map[string]mt.Timer)
-	netDataCounter.Init()
-	netDataTotalTime.Init()
+	expvarCounter.Init()
+	expvarTotal.Init()
+	expvarAvg.Init()
 	m.mu.Unlock()
 }
 
