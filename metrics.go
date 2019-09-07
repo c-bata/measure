@@ -25,9 +25,9 @@ var (
 	Disabled bool
 
 	defaultMetrics   *Metrics
+	expvarmu         sync.Mutex
 	netDataCounter   = expvar.NewMap("counters")
 	netDataTotalTime = expvar.NewMap("total")
-	expvarmu sync.Mutex
 )
 
 func init() {
@@ -98,8 +98,12 @@ func (m *Metrics) Update(key string, start time.Time) {
 	next := float64(t.Sum()) / float64(time.Millisecond)
 	expvarmu.Lock()
 	defer expvarmu.Unlock()
-	v := netDataTotalTime.Get(key).(*expvar.Float)
-	netDataTotalTime.AddFloat(key, next - v.Value())
+	v, ok := netDataTotalTime.Get(key).(*expvar.Float)
+	if !ok {
+		v = new(expvar.Float)
+		netDataTotalTime.Set(key, v)
+	}
+	netDataTotalTime.AddFloat(key, next-v.Value())
 }
 
 func (m *Metrics) GetStats() StatsSlice {

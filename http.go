@@ -20,3 +20,9 @@ func HandleStats(w http.ResponseWriter, r *http.Request) {
 			s.Key, s.Count, s.Sum, s.Min, s.Max, s.Avg, s.Rate, s.P95)
 	}
 }
+
+type Handler struct{}
+
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	HandleStats(w, r)
+}
