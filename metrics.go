@@ -1,6 +1,7 @@
 package measure
 
 import (
+	"expvar"
 	"sort"
 	"strings"
 	"sync"
@@ -24,6 +25,7 @@ var (
 	Disabled bool
 
 	defaultMetrics *Metrics
+	netDataCounter = expvar.NewMap("counters")
 )
 
 func init() {
@@ -37,6 +39,7 @@ type Measure struct {
 }
 
 func Start(key string) Measure {
+	netDataCounter.Add(key, 1)
 	return defaultMetrics.Start(key)
 }
 
@@ -57,6 +60,7 @@ func GetStats() StatsSlice {
 }
 
 func Reset() {
+	netDataCounter.Init()
 	defaultMetrics.Reset()
 }
 
