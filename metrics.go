@@ -62,6 +62,16 @@ func GetStats() StatsSlice {
 	return defaultMetrics.GetStats()
 }
 
+func SetKeys(keys []string) {
+	expvarmu.Lock()
+	defer expvarmu.Unlock()
+	for _, k := range keys {
+		expvarCounter.Set(k, new(expvar.Int))
+		expvarTotal.Set(k, new(expvar.Float))
+		expvarAvg.Set(k, new(expvar.Float))
+	}
+}
+
 func Reset() {
 	defaultMetrics.Reset()
 }
